@@ -1,0 +1,11 @@
+Options -Indexes
+
+# Disable PHP and script execution inside uploads/
+<FilesMatch "\.(?:php|phtml|phar|php[0-9]|cgi|pl|py|sh)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule php_module>
+    php_flag engine off
+</IfModule>
+

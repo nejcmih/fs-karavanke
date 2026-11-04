@@ -1,0 +1,30 @@
+# Environment & Secrets (NEVER commit)
+.env
+.env.*
+!.env.example
+*.p8
+*.key
+
+# Live User Uploads & Article Media (server-only)
+/public_html/uploads/*
+!/public_html/uploads/.htaccess
+/uploads/*
+!/uploads/.htaccess
+/clanki/*
+!/clanki/.htaccess
+
+# Dependencies & Build Artifacts
+/vendor/
+/node_modules/
+
+# Database dumps & Server error logs
+*.sql
+!/sql/*.sql
+error_log
+**/error_log
+
+# OS & Legacy Editor Metadata
+.DS_Store
+**/.DS_Store
+_notes/
+**/_notes/

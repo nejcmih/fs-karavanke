@@ -1,0 +1,17 @@
+Options -Indexes -MultiViews
+
+<Files "kartice_data.php">
+    Require all denied
+</Files>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Keep physical QR code URLs (/druzabna_igra/kartica01.php .. kartica66.php) working and clean .php from browser URL
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$ [NC]
+    RewriteCond %{THE_REQUEST} \s/+((?:.*/)?druzabna_igra/kartica[0-9]{2}[a-z]?)\.php(?:[\s?]) [NC]
+    RewriteRule ^kartica[0-9]{2}[a-z]?\.php$ /%1 [R=301,L,NE]
+
+    # Route clean /druzabna_igra/karticaXX (and .php fallback) to kartica.php
+    RewriteRule ^kartica([0-9]{2}[a-z]?)(?:\.php)?$ kartica.php?id=$1 [L,QSA]
+</IfModule>
