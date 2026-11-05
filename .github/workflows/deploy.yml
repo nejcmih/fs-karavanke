@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up PHP 8.2
         uses: shivammathur/setup-php@v2
@@ -29,6 +29,30 @@ jobs:
         run: |
           find . -path "./.git" -prune -o -name "*.php" -print0 | xargs -0 -n1 php -l
 
+      - name: Check FTP server reachability
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_PORT: ${{ vars.FTP_PORT || 21 }}
+        run: |
+          if [ -z "$FTP_SERVER" ]; then
+            echo "::error::FTP_SERVER secret is empty or missing."
+            exit 1
+          fi
+          case "$FTP_SERVER" in
+            *://*|*/*|*:*)
+              echo "::error::FTP_SERVER must be a bare hostname (e.g. ftp.example.si) without ftp://, port, or slashes."
+              exit 1
+              ;;
+          esac
+          echo "Resolving host..."
+          getent hosts "$FTP_SERVER" || { echo "::error::DNS lookup failed for FTP_SERVER."; exit 1; }
+          echo "Testing TCP connection on port $FTP_PORT..."
+          if ! timeout 15 bash -c "exec 3<>/dev/tcp/$FTP_SERVER/$FTP_PORT"; then
+            echo "::error::Cannot open TCP connection to FTP server on port $FTP_PORT. The host firewall is likely blocking GitHub Actions IPs, or the port is wrong."
+            exit 1
+          fi
+          echo "FTP port is reachable."
+
       - name: Deploy to cPanel via FTP/FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -38,6 +62,8 @@ jobs:
           protocol: ${{ vars.FTP_PROTOCOL || 'ftp' }}
           port: ${{ vars.FTP_PORT || 21 }}
           server-dir: ${{ vars.FTP_SERVER_DIR || './' }}
+          timeout: 120000
+          log-level: verbose
           exclude: |
             **/.git*
             **/.git*/**
