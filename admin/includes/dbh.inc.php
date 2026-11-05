@@ -38,7 +38,11 @@ if (!function_exists('loadProjectEnv')) {
     }
 }
 
-loadProjectEnv(dirname(__DIR__, 2) . '/.env');
+// Load .env from project root (public_html/.env or local XAMPP folder)
+// and fall back to one level above web root (/home/<cpanel_user>/.env on cPanel)
+$projectRoot = dirname(__DIR__, 2);
+loadProjectEnv($projectRoot . '/.env');
+loadProjectEnv(dirname($projectRoot) . '/.env');
 
 $serverName = (string) ($_ENV['DB_HOST'] ?? getenv('DB_HOST') ?: 'localhost');
 $dBPort = (int) ($_ENV['DB_PORT'] ?? getenv('DB_PORT') ?: 3306);
