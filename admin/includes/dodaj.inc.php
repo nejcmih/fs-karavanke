@@ -10,18 +10,22 @@ $naslov = isset($_POST['naslov']) ? trim((string) $_POST['naslov']) : '';
 $kategorija = isset($_POST['kategorija']) ? trim((string) $_POST['kategorija']) : '';
 $kraj = isset($_POST['kraj']) ? trim((string) $_POST['kraj']) : '';
 $datum = isset($_POST['datum']) ? trim((string) $_POST['datum']) : '';
-$preview = isset($_POST['preview']) ? trim((string) $_POST['preview']) : '';
-$besedilo = isset($_POST['besedilo']) ? trim((string) $_POST['besedilo']) : '';
+$rawBesedilo = isset($_POST['besedilo']) ? (string) $_POST['besedilo'] : '';
+$draftToken = isset($_POST['draft_token']) ? trim((string) $_POST['draft_token']) : '';
 
 require_once __DIR__ . '/dbh.inc.php';
 require_once __DIR__ . '/functions.inc.php';
+require_once __DIR__ . '/sanitize-html.inc.php';
+require_once __DIR__ . '/image-thumb.inc.php';
 
-if (emptyInputDodaj($naslov, $kategorija, $datum, $preview, $besedilo)) {
+if (isInvalidArticleMeta($naslov, $kategorija, $datum)) {
     header('Location: ../dodaj?error=emptyinput');
     exit();
 }
 
-// Validate optional preview/cover image if provided
+$cleanBesedilo = sanitizeArticleHtml($rawBesedilo);
+
+// Validate optional cover image if provided
 $coverFilename = '';
 $coverTmpPath = '';
 if (
@@ -43,7 +47,7 @@ if (
     $coverTmpPath = (string) $_FILES['previewfile']['tmp_name'];
 }
 
-// Validate optional gallery images (supports 0, 1, or 2+ images)
+// Validate optional bottom-gallery images
 $galleryItems = [];
 if (isset($_FILES['file']['error'])) {
     $errors = (array) $_FILES['file']['error'];
@@ -72,8 +76,26 @@ if (isset($_FILES['file']['error'])) {
     }
 }
 
+if ($cleanBesedilo === '' && $coverTmpPath === '' && $galleryItems === []) {
+    header('Location: ../dodaj?error=emptyinput');
+    exit();
+}
+
+$autoPreview = generateArticleExcerpt($cleanBesedilo, 280);
 $slikeColumn = implode('|', array_column($galleryItems, 'filename'));
-$hasUploadedFiles = $coverTmpPath !== '' || $galleryItems !== [];
+
+$clankiRoot = dirname(__DIR__, 2) . '/clanki';
+cleanupStaleDraftDirs($clankiRoot);
+
+$draftDir = '';
+if (preg_match('/^[a-f0-9]{32}$/', $draftToken) === 1) {
+    $candidateDraft = $clankiRoot . '/_draft_' . $draftToken;
+    if (is_dir($candidateDraft)) {
+        $draftDir = $candidateDraft;
+    }
+}
+
+$hasUploadedFiles = $coverTmpPath !== '' || $galleryItems !== [] || $draftDir !== '';
 $articleDir = '';
 $movedFiles = [];
 
@@ -89,8 +111,8 @@ try {
         ':kategorija' => $kategorija,
         ':kraj' => $kraj,
         ':datum' => $datum,
-        ':preview' => $preview,
-        ':besedilo' => $besedilo,
+        ':preview' => $autoPreview,
+        ':besedilo' => $cleanBesedilo,
         ':naslovnaslika' => $coverFilename,
         ':slike' => $slikeColumn,
         ':mapa' => '',
@@ -101,16 +123,65 @@ try {
         throw new RuntimeException('Failed to retrieve auto-increment ID for new article.');
     }
 
-    $updateMapaStmt = $pdo->prepare('UPDATE clanki SET mapa = :mapa WHERE ID = :id');
-    $updateMapaStmt->execute([
-        ':mapa' => (string) $newId,
-        ':id' => $newId,
-    ]);
-
     if ($hasUploadedFiles) {
-        $articleDir = dirname(__DIR__, 2) . '/clanki/' . $newId;
+        $articleDir = $clankiRoot . '/' . $newId;
         if (!is_dir($articleDir) && !@mkdir($articleDir, 0755, true) && !is_dir($articleDir)) {
             throw new RuntimeException('Unable to create article media directory: ' . $articleDir);
+        }
+
+        // Move inline editor images from temporary _draft_<token> into permanent clanki/<newId>/
+        if ($draftDir !== '' && is_dir($draftDir)) {
+            $draftEntries = @scandir($draftDir) ?: [];
+            $urlReplacements = [];
+
+            foreach ($draftEntries as $entry) {
+                if ($entry === '.' || $entry === '..' || !is_file($draftDir . '/' . $entry)) {
+                    continue;
+                }
+
+                $draftRel = 'clanki/_draft_' . $draftToken . '/' . $entry;
+                $finalRel = 'clanki/' . $newId . '/' . $entry;
+
+                // Capture old draft thumbnail URLs & remove temporary draft thumbs
+                $oldThumbUrls = [];
+                $resolvedDraft = resolveSafeMediaPath($draftRel);
+                if ($resolvedDraft['ok']) {
+                    foreach (THUMB_ALLOWED_WIDTHS as $w) {
+                        $oldThumbUrls[$w] = getThumbUrl($draftRel, $w, '../');
+                        $draftTarget = getThumbCacheTarget($resolvedDraft, $w);
+                        if (is_file($draftTarget['cacheAbs'])) {
+                            @unlink($draftTarget['cacheAbs']);
+                        }
+                    }
+                }
+
+                $destInline = $articleDir . '/' . $entry;
+                if (!@rename($draftDir . '/' . $entry, $destInline)) {
+                    throw new RuntimeException('Failed to move staged inline image.');
+                }
+                @chmod($destInline, 0644);
+                $movedFiles[] = $destInline;
+
+                prewarmThumbnails($finalRel, [960, 1280]);
+                foreach ($oldThumbUrls as $w => $oldUrl) {
+                    $newUrl = getThumbUrl($finalRel, $w, '../');
+                    if ($oldUrl !== $newUrl) {
+                        $urlReplacements[$oldUrl] = $newUrl;
+                    }
+                }
+            }
+
+            @rmdir($draftDir);
+
+            if ($urlReplacements !== []) {
+                $cleanBesedilo = strtr($cleanBesedilo, $urlReplacements);
+            }
+            $cleanBesedilo = str_replace(
+                'clanki/_draft_' . $draftToken . '/',
+                'clanki/' . $newId . '/',
+                $cleanBesedilo
+            );
+            $cleanBesedilo = sanitizeArticleHtml($cleanBesedilo);
         }
 
         if ($coverTmpPath !== '') {
@@ -118,7 +189,9 @@ try {
             if (!move_uploaded_file($coverTmpPath, $coverDest)) {
                 throw new RuntimeException('Failed to move uploaded cover image.');
             }
+            @chmod($coverDest, 0644);
             $movedFiles[] = $coverDest;
+            prewarmThumbnails('clanki/' . $newId . '/' . $coverFilename, [960, 1280]);
         }
 
         foreach ($galleryItems as $item) {
@@ -126,9 +199,18 @@ try {
             if (!move_uploaded_file($item['tmp_path'], $dest)) {
                 throw new RuntimeException('Failed to move uploaded gallery image.');
             }
+            @chmod($dest, 0644);
             $movedFiles[] = $dest;
+            prewarmThumbnails('clanki/' . $newId . '/' . $item['filename'], [960]);
         }
     }
+
+    $updateStmt = $pdo->prepare('UPDATE clanki SET mapa = :mapa, besedilo = :besedilo WHERE ID = :id');
+    $updateStmt->execute([
+        ':mapa' => (string) $newId,
+        ':besedilo' => $cleanBesedilo,
+        ':id' => $newId,
+    ]);
 
     $pdo->commit();
 } catch (Throwable $e) {
@@ -150,5 +232,5 @@ try {
     exit();
 }
 
-header('Location: ../dodaj?error=none');
+header('Location: ../clanki?error=added&id=' . $newId);
 exit();

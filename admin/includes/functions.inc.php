@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/auth.inc.php';
 
-const MAX_IMAGE_UPLOAD_BYTES = 5242880; // 5 MB
+const MAX_IMAGE_UPLOAD_BYTES = 12582912; // 12 MB
 
 /**
  * Allowed article categories in the database.
@@ -121,26 +121,16 @@ function loginUser(PDO $pdo, string $username, string $pwd): void
     exit();
 }
 
-function emptyInputDodaj(string $naslov, string $kategorija, string $datum, string $preview, string $besedilo): bool
+/**
+ * Validate required article metadata (title, valid category, valid ISO date).
+ */
+function isInvalidArticleMeta(string $naslov, string $kategorija, string $datum): bool
 {
-    return trim($naslov) === ''
-        || trim($kategorija) === ''
-        || trim($datum) === ''
-        || trim($preview) === ''
-        || trim($besedilo) === ''
-        || !isValidCategory($kategorija)
-        || !isValidIsoDate($datum);
-}
-
-function emptyInputUredi(string $naslov, string $kategorija, string $datum, string $preview, string $besedilo): bool
-{
-    return trim($naslov) === ''
-        || trim($kategorija) === ''
-        || trim($datum) === ''
-        || trim($preview) === ''
-        || trim($besedilo) === ''
-        || !isValidCategory($kategorija)
-        || !isValidIsoDate($datum);
+    $trimmedTitle = trim($naslov);
+    return $trimmedTitle === ''
+        || mb_strlen($trimmedTitle, 'UTF-8') > 200
+        || !isValidCategory(trim($kategorija))
+        || !isValidIsoDate(trim($datum));
 }
 
 /**
@@ -176,42 +166,42 @@ function validateUploadedImage(string $tmpPath, int $fileSize, int $fileError): 
     return ['ok' => true, 'filename' => $safeFilename];
 }
 
-function urediClanek(
-    PDO $pdo,
-    int $id,
-    string $naslov,
-    string $kategorija,
-    string $kraj,
-    string $datum,
-    string $preview,
-    string $besedilo
-): void {
-    try {
-        $stmt = $pdo->prepare(
-            'UPDATE clanki
-             SET naslov = :naslov,
-                 kategorija = :kategorija,
-                 kraj = :kraj,
-                 datum = :datum,
-                 preview = :preview,
-                 besedilo = :besedilo
-             WHERE ID = :id'
-        );
-        $stmt->execute([
-            ':naslov' => trim($naslov),
-            ':kategorija' => trim($kategorija),
-            ':kraj' => trim($kraj),
-            ':datum' => trim($datum),
-            ':preview' => trim($preview),
-            ':besedilo' => trim($besedilo),
-            ':id' => $id,
-        ]);
-    } catch (Throwable $e) {
-        error_log('urediClanek update failed: ' . $e->getMessage());
-        header('Location: ../uredi?id=' . $id . '&error=stmtfailed');
-        exit();
+/**
+ * Remove abandoned _draft_<hex> media folders older than $maxAgeSeconds.
+ */
+function cleanupStaleDraftDirs(string $clankiRoot, int $maxAgeSeconds = 86400): void
+{
+    if (!is_dir($clankiRoot)) {
+        return;
     }
 
-    header('Location: ../clanki?error=edited');
-    exit();
+    $entries = @scandir($clankiRoot);
+    if (!is_array($entries)) {
+        return;
+    }
+
+    $now = time();
+    foreach ($entries as $entry) {
+        if (preg_match('/^_draft_[a-f0-9]{32}$/', $entry) !== 1) {
+            continue;
+        }
+        $dirPath = $clankiRoot . '/' . $entry;
+        if (!is_dir($dirPath)) {
+            continue;
+        }
+        $mtime = (int) (@filemtime($dirPath) ?: 0);
+        if ($mtime > 0 && ($now - $mtime) > $maxAgeSeconds) {
+            $files = @scandir($dirPath);
+            if (is_array($files)) {
+                require_once __DIR__ . '/image-thumb.inc.php';
+                foreach ($files as $f) {
+                    if ($f !== '.' && $f !== '..' && is_file($dirPath . '/' . $f)) {
+                        deleteCachedThumbnails('clanki/' . $entry . '/' . $f);
+                        @unlink($dirPath . '/' . $f);
+                    }
+                }
+            }
+            @rmdir($dirPath);
+        }
+    }
 }

@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/image-thumb.inc.php';
+
 /**
  * Fetch and render article preview rows using PDO prepared statements.
  *
@@ -65,10 +67,11 @@ function renderArticleList(PDO $pdo, array $options = []): void
 
     foreach ($rows as $row) {
         $id = (int) $row['ID'];
-        $naslov = htmlspecialchars((string) $row['naslov'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $naslovRaw = (string) $row['naslov'];
+        $naslov = htmlspecialchars($naslovRaw, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $krajRaw = trim((string) ($row['kraj'] ?? ''));
         $datum = htmlspecialchars((string) $row['lepdatum'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $preview = (string) ($row['preview'] ?? '');
+        $preview = trim((string) ($row['preview'] ?? ''));
         $coverRaw = trim((string) ($row['naslovnaslika'] ?? ''));
 
         $articleUrl = htmlspecialchars($basePrefix . 'clanki/' . $id, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -87,18 +90,23 @@ function renderArticleList(PDO $pdo, array $options = []): void
         }
 
         if ($showReadMore) {
-            echo '<p>' . $preview . ' &nbsp;<a href="' . $articleUrl . '" class="povezava">Preberi več...</a></p>';
-        } else {
+            if ($preview !== '') {
+                echo '<p>' . $preview . ' &nbsp;<a href="' . $articleUrl . '" class="povezava">Preberi več...</a></p>';
+            } else {
+                echo '<p><a href="' . $articleUrl . '" class="povezava">Preberi več...</a></p>';
+            }
+        } elseif ($preview !== '') {
             echo '<p>' . $preview . '</p>';
         }
 
         echo '</div>';
         echo '<div class="col-md-6">';
         if ($coverRaw !== '') {
-            $coverUrl = htmlspecialchars($basePrefix . 'clanki/' . $id . '/' . rawurlencode($coverRaw), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            echo '<a href="' . $articleUrl . '"><img src="' . $coverUrl . '" alt="' . $naslov . '" loading="lazy"></a>';
+            $relCoverPath = 'clanki/' . $id . '/' . $coverRaw;
+            echo '<a href="' . $articleUrl . '">'
+                . renderProgressiveImg($relCoverPath, $naslovRaw, $basePrefix, 960)
+                . '</a>';
         }
         echo '</div></div>';
     }
 }
-

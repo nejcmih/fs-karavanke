@@ -22,6 +22,7 @@
 !/sql/*.sql
 error_log
 **/error_log
+/sql
 
 # OS & Legacy Editor Metadata
 .DS_Store

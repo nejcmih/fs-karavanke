@@ -13,6 +13,7 @@ if (!is_int($id) || $id <= 0) {
 }
 
 require_once __DIR__ . '/dbh.inc.php';
+require_once __DIR__ . '/image-thumb.inc.php';
 
 try {
     $stmt = $pdo->prepare('DELETE FROM clanki WHERE ID = :id');
@@ -33,6 +34,7 @@ if (is_dir($articleDir)) {
             }
             $entryPath = $articleDir . '/' . $entry;
             if (is_file($entryPath)) {
+                deleteCachedThumbnails('clanki/' . $id . '/' . $entry);
                 @unlink($entryPath);
             }
         }
