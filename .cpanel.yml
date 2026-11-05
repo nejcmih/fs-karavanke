@@ -1,7 +1,7 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/shw28072/public_html
+    - export DEPLOYPATH=/domains/fs-karavanke.si/public_html
     - /bin/mkdir -p $DEPLOYPATH/uploads $DEPLOYPATH/clanki
     - /bin/rsync -av --delete --exclude='.git*' --exclude='.cpanel.yml' --exclude='.env*' --exclude='.github*' --exclude='agents.md' --exclude='README.md' --exclude='sql/' --exclude='*.sql' --exclude='.well-known/' --exclude='cgi-bin/' --exclude='uploads/' --exclude='clanki/' ./ $DEPLOYPATH/
     - /bin/cp uploads/.htaccess $DEPLOYPATH/uploads/.htaccess
