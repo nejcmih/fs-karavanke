@@ -33,6 +33,8 @@ require __DIR__ . '/header.php';
                       <div class="alert alert-danger py-2 small">Izpolni uporabniško ime in geslo.</div>
                   <?php elseif ($error === 'wronglogin'): ?>
                       <div class="alert alert-danger py-2 small">Napačno uporabniško ime ali geslo.</div>
+                  <?php elseif ($error === 'ratelimit'): ?>
+                      <div class="alert alert-danger py-2 small">Preveč neuspešnih poskusov prijave. Počakaj 15 minut in poskusi znova.</div>
                   <?php elseif ($error === 'csrf'): ?>
                       <div class="alert alert-warning py-2 small">Seja je potekla. Poskusi se prijaviti znova.</div>
                   <?php endif; ?>

@@ -161,7 +161,14 @@ function generateThumbnailFile(string $srcAbs, string $destAbs, int $maxWidth, i
     @ini_set('memory_limit', '256M');
 
     $info = @getimagesize($srcAbs);
-    if (!is_array($info) || $info[0] <= 0 || $info[1] <= 0) {
+    if (
+        !is_array($info) ||
+        $info[0] <= 0 ||
+        $info[1] <= 0 ||
+        $info[0] > 8000 ||
+        $info[1] > 8000 ||
+        ($info[0] * $info[1]) > 36000000
+    ) {
         return false;
     }
 

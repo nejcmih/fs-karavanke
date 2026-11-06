@@ -11,6 +11,11 @@ function isSafeArticleUrl(string $url, bool $isImageSrc = false): bool
         return false;
     }
 
+    // Reject protocol-relative URLs (//example.com or \\example.com)
+    if (str_starts_with($trimmed, '//') || str_starts_with($trimmed, '\\\\')) {
+        return false;
+    }
+
     // Strip control chars and whitespace before checking protocol
     $normalized = preg_replace('/[\x00-\x20]+/', '', strtolower($trimmed)) ?? '';
     if (
@@ -22,21 +27,28 @@ function isSafeArticleUrl(string $url, bool $isImageSrc = false): bool
         return false;
     }
 
+    if ($isImageSrc) {
+        // Inline article images may only reference local site media paths
+        return (
+            str_starts_with($trimmed, '../clanki/') ||
+            str_starts_with($trimmed, 'clanki/') ||
+            str_starts_with($trimmed, '../uploads/') ||
+            str_starts_with($trimmed, 'uploads/') ||
+            str_starts_with($trimmed, '../thumb?') ||
+            str_starts_with($trimmed, 'thumb?')
+        );
+    }
+
     if (
         str_starts_with($trimmed, 'https://') ||
         str_starts_with($trimmed, 'http://') ||
         str_starts_with($trimmed, '../') ||
         str_starts_with($trimmed, './') ||
-        str_starts_with($trimmed, '/')
-    ) {
-        return true;
-    }
-
-    if (!$isImageSrc && (
+        str_starts_with($trimmed, '/') ||
         str_starts_with($trimmed, 'mailto:') ||
         str_starts_with($trimmed, 'tel:') ||
         str_starts_with($trimmed, '#')
-    )) {
+    ) {
         return true;
     }
 
@@ -467,9 +479,9 @@ function formatArticleBodyForDisplay(string $storedHtml): string
         ) ?? $trimmed;
     }
 
-    if (preg_match('/^\s*<(?:p|h[1-6]|ul|ol|blockquote|figure|div)\b/i', $trimmed) === 1) {
-        return $trimmed;
+    if (preg_match('/^\s*<(?:p|h[1-6]|ul|ol|blockquote|figure|div)\b/i', $trimmed) !== 1) {
+        $trimmed = '<p>' . $trimmed . '</p>';
     }
 
-    return '<p>' . $trimmed . '</p>';
+    return sanitizeArticleHtml($trimmed);
 }

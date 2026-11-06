@@ -71,7 +71,15 @@ function renderArticleList(PDO $pdo, array $options = []): void
         $naslov = htmlspecialchars($naslovRaw, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $krajRaw = trim((string) ($row['kraj'] ?? ''));
         $datum = htmlspecialchars((string) $row['lepdatum'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $preview = trim((string) ($row['preview'] ?? ''));
+        $previewRaw = trim((string) ($row['preview'] ?? ''));
+        $previewPlain = trim(
+            preg_replace(
+                '/\s+/u',
+                ' ',
+                html_entity_decode(strip_tags($previewRaw), ENT_QUOTES | ENT_HTML5, 'UTF-8')
+            ) ?? ''
+        );
+        $preview = htmlspecialchars($previewPlain, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $coverRaw = trim((string) ($row['naslovnaslika'] ?? ''));
 
         $articleUrl = htmlspecialchars($basePrefix . 'clanki/' . $id, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');

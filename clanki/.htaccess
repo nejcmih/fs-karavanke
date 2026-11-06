@@ -2,7 +2,7 @@ Options -Indexes -MultiViews
 DirectorySlash Off
 
 # Disable PHP and script execution inside clanki/ media folders
-<FilesMatch "\.(?:php|phtml|phar|php[0-9]|cgi|pl|py|sh)$">
+<FilesMatch "(?i)\.(?:php[0-9]?|phtml|phar|inc|cgi|pl|py|sh|shtml|htaccess)$">
     Require all denied
 </FilesMatch>
 

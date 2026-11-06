@@ -1,0 +1,8 @@
+Options -Indexes
+
+# Block direct HTTP requests to internal PHP library/partial files;
+# only action controllers (login, logout, signup, dodaj, uredi, brisi, upload-media) are HTTP-callable.
+<FilesMatch "^(?:auth|dbh|functions|clanki-list|image-thumb|sanitize-html|editor-toolbar)\.inc\.php$">
+    Require all denied
+</FilesMatch>
+

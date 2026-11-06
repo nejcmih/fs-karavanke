@@ -29,6 +29,8 @@ require __DIR__ . '/header.php';
                   <div class="alert alert-danger">Izpolni vsa zahtevana polja!</div>
               <?php elseif ($error === 'invaliduid'): ?>
                   <div class="alert alert-danger">Uporabniško ime lahko vsebuje le črke (a-z) in številke (0-9).</div>
+              <?php elseif ($error === 'weakpwd'): ?>
+                  <div class="alert alert-danger">Geslo mora vsebovati vsaj 10 znakov.</div>
               <?php elseif ($error === 'usernametaken'): ?>
                   <div class="alert alert-danger">To uporabniško ime je že zasedeno.</div>
               <?php elseif ($error === 'stmtfailed'): ?>
@@ -57,8 +59,8 @@ require __DIR__ . '/header.php';
                               </div>
 
                               <div class="mb-4">
-                                  <label for="newPwdInput" class="form-label fw-medium small">Geslo</label>
-                                  <input type="password" id="newPwdInput" name="pwd" class="form-control" autocomplete="new-password" required>
+                                  <label for="newPwdInput" class="form-label fw-medium small">Geslo (vsaj 10 znakov)</label>
+                                  <input type="password" id="newPwdInput" name="pwd" class="form-control" autocomplete="new-password" minlength="10" required>
                               </div>
 
                               <button type="submit" name="submit" class="btn btn-fsk w-100">

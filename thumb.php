@@ -33,6 +33,7 @@ $size = (int) (@filesize($serveFile) ?: 0);
 $etag = '"' . sha1($serveFile . '|' . $mtime . '|' . $size) . '"';
 
 header('Content-Type: ' . $serveMime);
+header('X-Content-Type-Options: nosniff');
 header('Cache-Control: public, max-age=31536000, immutable');
 header('ETag: ' . $etag);
 

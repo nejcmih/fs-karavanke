@@ -23,6 +23,11 @@ if (invalidUid($username)) {
     exit();
 }
 
+if (invalidPasswordLength($pwd)) {
+    header('Location: ../signup?error=weakpwd');
+    exit();
+}
+
 if (uidExists($pdo, $username) !== false) {
     header('Location: ../signup?error=usernametaken');
     exit();
